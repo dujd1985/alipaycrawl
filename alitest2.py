@@ -77,11 +77,11 @@ if element and pe and login_btn:
         'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8',
         'Host':'mbillexprod.alipay.com',
         'Origin':'https://mbillexprod.alipay.com',
-        'Referer':'https://mbillexprod.alipay.com/enterprise/sellQuery.htm;jsessionid=' + jsessionid,
+        'Referer':'https://mbillexprod.alipay.com/enterprise/fundAccountDetail.htm;jsessionid=' + jsessionid,
         'User-Agent':'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.101 Safari/537.36',
         'X-Requested-With': 'XMLHttpRequest'
     }
-    ten_min_ago = time.time() - 60 * 10
+    ten_min_ago = time.time() - 60 * 30
     now = time.time()
     start = time.strftime('%Y-%m-%d+%H', time.localtime(ten_min_ago)) + '%3A'
     if time.localtime(ten_min_ago).tm_min < 10:
@@ -93,8 +93,11 @@ if element and pe and login_btn:
         end += '0' + str(time.localtime(now).tm_min)
     else:
         end += str(time.localtime(now).tm_min)
+    start += '%3A00'
+    end += '%3A00'
     print start
     print end
+
     form_data = {
         'startTime': start,
         'endTime': end,
@@ -118,12 +121,14 @@ if element and pe and login_btn:
         'ctoken': ctoken}
     #data_str = "startTime=" + start + "&endTime=" + end + "&startAmount=&endAmount=&targetMainAccount=&goodsTitle=&sortType=0&sortTarget=gmtCreate&pageSize=20&pageNum=1&billUserId=2088621608234792&status=ALL&forceAync=0&searchType=1&fromTime=" + start.split("+")[1] + "&toTime=" + end.split("+")[1] + "&tradeFrom=ALL&tradeType=0&_input_charset=utf-8&ctoken=" + ctoken
     #data_str = "startTime=2017-08-19+00%3A00&endTime=2017-08-20+00%3A00&startAmount=&endAmount=&targetMainAccount=&goodsTitle=&sortType=0&sortTarget=gmtCreate&pageSize=20&pageNum=1&billUserId=2088621608234792&status=ALL&forceAync=0&searchType=1&fromTime=00%3A00&toTime=00%3A00&tradeFrom=ALL&tradeType=0&_input_charset=utf-8&ctoken=" + ctoken
-    data_str = "startDateInput=" + start + "&endDateInput=" + end + "&startAmount=&endAmount=&targetMainAccount=&activeTargetSearchItem=&orderNo=&tradeNo=&sortType=0&sortTarget=tradeTime&showType=0&searchType=0&pageSize=20&pageNum=1&billUserId=2088521166926244&forceAync=0&fromTime=" + start.split("+")[1] + "&toTime=" + end.split("+")[1] + "&type=&_input_charset=utf-8&ctoken=" + ctoken
+    data_str = "queryEntrance=1&billUserId=2088521166926244&showType=0&type=&precisionQueryKey=tradeNo&startDateInput=" + start + "&endDateInput=" + end + "&pageSize=200&pageNum=1&total=6&sortTarget=tradeTime&order=descend&sortType=0&_input_charset=utf-8&ctoken=" + ctoken;
+    #data_str = "startDateInput=" + start + "&endDateInput=" + end + "&startAmount=&endAmount=&targetMainAccount=&activeTargetSearchItem=&orderNo=&tradeNo=&sortType=0&sortTarget=tradeTime&showType=0&searchType=0&pageSize=200&pageNum=1&billUserId=2088521166926244&forceAync=0&fromTime=" + start.split("+")[1] + "&toTime=" + end.split("+")[1] + "&type=&_input_charset=utf-8&ctoken=" + ctoken
     print "before post"
     print c
     print data_str
 #   r = requests.post('https://mbillexprod.alipay.com/enterprise/sellTransQuery.json', headers=headers, cookies=c, data=data_str)
-    r = requests.post('https://mbillexprod.alipay.com/enterprise/accountDetailQuery.json', headers=headers, cookies=c, data=data_str, verify=False)
+    r = requests.post('https://mbillexprod.alipay.com/enterprise/fundAccountDetail.json', headers=headers, cookies=c, data=data_str, verify=False)
+
     deny = r.text.find('deny')
     fuck = 1
     while (deny != -1):
@@ -132,7 +137,7 @@ if element and pe and login_btn:
         if fuck == 4:
             break
         time.sleep(10)
-        r = requests.post('https://mbillexprod.alipay.com/enterprise/accountDetailQuery.json', headers=headers, cookies=c, data=data_str, verify=False)
+        r = requests.post('https://mbillexprod.alipay.com/enterprise/fundAccountDetail.json', headers=headers, cookies=c, data=data_str, verify=False)
         deny = r.text.find('deny')
 
 
@@ -144,8 +149,33 @@ if element and pe and login_btn:
     output.write(r.text)
     output.write('\n')
     output.close()
-    #search = WebDriverWait(driver, 10,1).until(EC.presence_of_element_located((By.ID, "J_combineSearchBtn")))
-    #search.click()
+
+#post data to squloan
+    squList = json.loads(r.text)
+
+    if squList['result']['detail']:
+        for squ in squList['result']['detail']:
+            if squ['accountType'] == '转账' :
+                if float(squ['tradeAmount']) > 0 :
+
+                    tradeTime = squ['tradeTime']
+                    tradeNo = squ['tradeNo']
+                    transMemo = squ['transMemo']
+                    tradeAmount = squ['tradeAmount']
+                    otherAccountEmail = squ['otherAccountEmail']
+                    otherAccountFullname = squ['otherAccountFullname']
+                    
+                    payload = {'tradeTime': tradeTime, 'tradeNo': tradeNo, 'transMemo' : transMemo,'tradeAmount': tradeAmount, 'otherAccountEmail':otherAccountEmail, 'otherAccountFullname':otherAccountFullname}
+                    r = requests.get('http://xxxxxxxxxxxx', params=payload)
+                    
+                    #print tradeNo
+                    #print tradeAmount
+                    logInfo = str(time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time()))) + '   ' + str(r.url) + '   ' + str(r.status_code) + '   ' + str(r.raise_for_status()) + '\n'
+                    output = open(info_dict["httplog"], 'a')
+                    output.write(logInfo)
+                    output.close()
+##end post
+
     driver.close()
     driver.quit()
     display.stop()
@@ -154,5 +184,5 @@ if element and pe and login_btn:
     import os
     os.system('killall chrome')
     os.system('killall chromedriver')
-	os.system('killall Xvfb')
+    os.system('killall Xvfb')
 
